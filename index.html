@@ -692,8 +692,39 @@
 
 <!-- ════════════════════════ SCRIPTS ════════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
+<script type="module">
 'use strict';
+
+// ── Firebase ──────────────────────────────────────────────────────────────────
+import { initializeApp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyDVAFDOC6kKRq8tCWCVuuSGdt5aQRrJJcA",
+  authDomain:        "cans-for-college.firebaseapp.com",
+  projectId:         "cans-for-college",
+  storageBucket:     "cans-for-college.firebasestorage.app",
+  messagingSenderId: "804307299178",
+  appId:             "1:804307299178:web:42b185d5a3c50cc3f9d313",
+  measurementId:     "G-FVDQCZYNXF",
+};
+const fbApp = initializeApp(firebaseConfig);
+const fsDb  = getFirestore(fbApp);
+
+// ── In-memory cache ───────────────────────────────────────────────────────────
+let _members    = [];
+let _associates = [];
+
+async function loadAll() {
+  const [mSnap, aSnap] = await Promise.all([
+    getDocs(collection(fsDb, 'members')),
+    getDocs(collection(fsDb, 'associates')),
+  ]);
+  _members    = mSnap.docs.map(d => d.data());
+  _associates = aSnap.docs.map(d => d.data()).sort((a, b) => a.id.localeCompare(b.id));
+}
 
 // ── Associate color palette ───────────────────────────────────────────────────
 const ASSOC_PALETTE = [
@@ -703,44 +734,55 @@ const ASSOC_PALETTE = [
 ];
 function assocColor(assocId) {
   if (!assocId) return '#888';
-  const associates = ADB.all();
-  const idx = associates.findIndex(a => a.id === assocId);
+  const idx = _associates.findIndex(a => a.id === assocId);
   return ASSOC_PALETTE[idx >= 0 ? idx % ASSOC_PALETTE.length : 0];
 }
 
-// ── LocalStorage DB ───────────────────────────────────────────────────────────
+// ── Members DB (Firestore-backed) ─────────────────────────────────────────────
 const DB = {
-  _key: 'cfc_members',
-  all()  { return JSON.parse(localStorage.getItem(this._key) || '[]'); },
-  save(arr) { localStorage.setItem(this._key, JSON.stringify(arr)); },
+  all()   { return _members; },
   nextId() {
-    const m = this.all();
-    return m.length === 0 ? 1001 : Math.max(...m.map(x => x.id)) + 1;
+    return _members.length === 0 ? 1001 : Math.max(..._members.map(x => x.id)) + 1;
   },
-  add(member)    { const m = this.all(); m.push(member); this.save(m); },
-  find(id)       { return this.all().find(m => m.id === id) || null; },
-  update(member) {
-    const m = this.all();
-    const i = m.findIndex(x => x.id === member.id);
-    if (i !== -1) { m[i] = member; this.save(m); return true; }
-    return false;
+  async add(member) {
+    await setDoc(doc(fsDb, 'members', String(member.id)), member);
+    _members.push(member);
+  },
+  find(id) { return _members.find(m => m.id === id) || null; },
+  async update(member) {
+    await setDoc(doc(fsDb, 'members', String(member.id)), member);
+    const i = _members.findIndex(x => x.id === member.id);
+    if (i !== -1) _members[i] = member;
+  },
+  async delete(id) {
+    await deleteDoc(doc(fsDb, 'members', String(id)));
+    _members = _members.filter(m => m.id !== id);
   },
 };
 
-// ── Associates DB ─────────────────────────────────────────────────────────────
+// ── Associates DB (Firestore-backed) ──────────────────────────────────────────
 const ADB = {
-  _key: 'cfc_associates',
-  all()  { return JSON.parse(localStorage.getItem(this._key) || '[]'); },
-  save(arr) { localStorage.setItem(this._key, JSON.stringify(arr)); },
+  all()   { return _associates; },
   nextId() {
-    const a = this.all();
-    if (a.length === 0) return 'A001';
-    const nums = a.map(x => parseInt(x.id.slice(1)));
+    if (_associates.length === 0) return 'A001';
+    const nums = _associates.map(x => parseInt(x.id.slice(1)));
     return 'A' + String(Math.max(...nums) + 1).padStart(3, '0');
   },
-  add(assoc)   { const a = this.all(); a.push(assoc); this.save(a); },
-  find(id)     { return this.all().find(a => a.id === id) || null; },
-  delete(id)   { this.save(this.all().filter(a => a.id !== id)); },
+  async add(assoc) {
+    await setDoc(doc(fsDb, 'associates', assoc.id), assoc);
+    _associates.push(assoc);
+    _associates.sort((a, b) => a.id.localeCompare(b.id));
+  },
+  find(id) { return _associates.find(a => a.id === id) || null; },
+  async update(assoc) {
+    await setDoc(doc(fsDb, 'associates', assoc.id), assoc);
+    const i = _associates.findIndex(a => a.id === assoc.id);
+    if (i !== -1) _associates[i] = assoc;
+  },
+  async delete(id) {
+    await deleteDoc(doc(fsDb, 'associates', id));
+    _associates = _associates.filter(a => a.id !== id);
+  },
 };
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -904,7 +946,7 @@ async function registerMember(e) {
     existing.pickupDay   = pickupDay;
     existing.associateId = associateId;
     if (needsGeocode) existing.coordinates = coords;
-    DB.update(existing);
+    await DB.update(existing);
 
     btn.disabled = false;
     cancelMemberEdit();
@@ -930,7 +972,7 @@ async function registerMember(e) {
     registeredAt: new Date().toISOString(),
   };
 
-  DB.add(member);
+  await DB.add(member);
   btn.disabled = false;
   btn.innerHTML = 'Register Member';
   e.target.reset();
@@ -979,11 +1021,11 @@ function cancelMemberEdit() {
   document.getElementById('reg-clear-btn').style.display  = 'inline-flex';
 }
 
-function deleteMember(id) {
+async function deleteMember(id) {
   const m = DB.find(id);
   if (!m) return;
   if (!confirm(`Delete ${m.firstName} ${m.lastName} (#${m.id}) and all their collections? This cannot be undone.`)) return;
-  DB.save(DB.all().filter(x => x.id !== id));
+  await DB.delete(id);
   if (_editingMemberId === id) cancelMemberEdit();
   renderRegMembers();
   updateStats();
@@ -1062,7 +1104,7 @@ function lookupMember() {
   document.getElementById('log-form').style.display = 'block';
 }
 
-function logCollection(e) {
+async function logCollection(e) {
   e.preventDefault();
   if (!_activeId) return;
 
@@ -1073,7 +1115,7 @@ function logCollection(e) {
 
   member.collections.push({ date, weight });
   member.totalWeight = parseFloat((member.totalWeight + weight).toFixed(2));
-  DB.update(member);
+  await DB.update(member);
   document.getElementById('log-weight').value = '';
 
   // Refresh preview
@@ -1101,7 +1143,7 @@ function editCollection(origIdx) {
   document.getElementById(`edit-w-${origIdx}`).focus();
 }
 
-function saveEdit(origIdx) {
+async function saveEdit(origIdx) {
   const input = document.getElementById(`edit-w-${origIdx}`);
   const newWeight = parseFloat(input.value);
   if (!newWeight || newWeight <= 0) { input.style.borderColor = '#e74c3c'; return; }
@@ -1112,7 +1154,7 @@ function saveEdit(origIdx) {
   const oldWeight = member.collections[origIdx].weight;
   member.collections[origIdx].weight = newWeight;
   member.totalWeight = parseFloat((member.totalWeight - oldWeight + newWeight).toFixed(2));
-  DB.update(member);
+  await DB.update(member);
 
   lookupMember();
   showAlert('log-success',
@@ -1121,14 +1163,14 @@ function saveEdit(origIdx) {
   setTimeout(() => hideAlert('log-success'), 5000);
 }
 
-function deleteCollection(origIdx) {
+async function deleteCollection(origIdx) {
   const member = DB.find(_activeId);
   if (!member) return;
   const c = member.collections[origIdx];
   if (!confirm(`Delete the ${c.weight} lbs collection on ${c.date}? This cannot be undone.`)) return;
   member.totalWeight = parseFloat((member.totalWeight - c.weight).toFixed(2));
   member.collections.splice(origIdx, 1);
-  DB.update(member);
+  await DB.update(member);
   lookupMember();
   showAlert('log-success',
     `🗑️ Collection of <strong>${c.weight} lbs</strong> on ${c.date} removed. New total: <strong>${member.totalWeight.toFixed(1)} lbs</strong>.`,
@@ -1235,7 +1277,7 @@ function renderMap() {
 // ── Associates ────────────────────────────────────────────────────────────────
 let _editingAssocId = null;
 
-function registerAssociate(e) {
+async function registerAssociate(e) {
   e.preventDefault();
   hideAlert('assoc-success');
   hideAlert('assoc-error');
@@ -1251,7 +1293,7 @@ function registerAssociate(e) {
     existing.firstName = firstName;
     existing.lastName  = lastName;
     existing.phone     = phone;
-    ADB.save(ADB.all().map(a => a.id === _editingAssocId ? existing : a));
+    await ADB.update(existing);
     cancelAssociateEdit();
     renderAssocTable();
     populateAssocDropdown();
@@ -1268,7 +1310,7 @@ function registerAssociate(e) {
     registeredAt: new Date().toISOString(),
   };
 
-  ADB.add(assoc);
+  await ADB.add(assoc);
   e.target.reset();
   renderAssocTable();
   populateAssocDropdown();
@@ -1362,13 +1404,13 @@ function viewAssociateMembers(assocId) {
   renderTable();
 }
 
-function deleteAssociate(id) {
+async function deleteAssociate(id) {
   const a = ADB.find(id);
   if (!a) return;
   const count = DB.all().filter(m => m.associateId === id).length;
   const warn  = count > 0 ? ` This associate has ${count} registered member(s) — they will remain but lose their associate link.` : '';
   if (!confirm(`Delete Associate ${id} — ${a.firstName} ${a.lastName}?${warn}`)) return;
-  ADB.delete(id);
+  await ADB.delete(id);
   renderAssocTable();
   populateAssocDropdown();
   updateStats();
@@ -1499,12 +1541,42 @@ function printReport() {
   setTimeout(() => win.print(), 400);
 }
 
+// ── Expose functions on window (required for inline onclick with type="module") ──
+window.checkPassword        = checkPassword;
+window.skipAccess           = skipAccess;
+window.switchTab            = switchTab;
+window.registerMember       = registerMember;
+window.editMember           = editMember;
+window.cancelMemberEdit     = cancelMemberEdit;
+window.deleteMember         = deleteMember;
+window.renderTable          = renderTable;
+window.lookupMember         = lookupMember;
+window.logCollection        = logCollection;
+window.editCollection       = editCollection;
+window.saveEdit             = saveEdit;
+window.deleteCollection     = deleteCollection;
+window.clearLog             = clearLog;
+window.registerAssociate    = registerAssociate;
+window.editAssociate        = editAssociate;
+window.cancelAssociateEdit  = cancelAssociateEdit;
+window.deleteAssociate      = deleteAssociate;
+window.viewAssociateMembers = viewAssociateMembers;
+window.renderReport         = renderReport;
+window.printReport          = printReport;
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
-updateStats();
-renderTable();
-renderAssocTable();
-renderRegMembers();
-populateAssocDropdown();
+(async () => {
+  try {
+    await loadAll();
+  } catch (err) {
+    console.error('Firebase load error:', err);
+  }
+  updateStats();
+  renderTable();
+  renderAssocTable();
+  renderRegMembers();
+  populateAssocDropdown();
+})();
 </script>
 </body>
 </html>
