@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cans for College – Recycling Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --green:       #1e7e34;
+      --green-mid:   #28a745;
+      --green-light: #48c664;
+      --green-pale:  #d4edda;
+      --blue:        #1a3a8f;
+      --blue-light:  #2d5be3;
+      --orange:      #e67e22;
+      --purple:      #8e44ad;
+      --gray:        #6c757d;
+      --border:      #dee2e6;
+      --shadow:      0 2px 14px rgba(0,0,0,0.08);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f0f4f2;
+      color: #212529;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, var(--green) 0%, var(--blue) 100%);
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+    .logo-icon { font-size: 2.2rem; line-height: 1; }
+    .header-text h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.3px; }
+    .header-text p  { font-size: 0.82rem; opacity: .82; margin-top: 2px; }
+
+    /* ── Nav ── */
+    nav {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      overflow-x: auto;
+    }
+    .nav-btn {
+      padding: 0.95rem 1.3rem;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--gray);
+      white-space: nowrap;
+      transition: color .2s, border-color .2s;
+    }
+    .nav-btn:hover  { color: var(--green); }
+    .nav-btn.active { color: var(--green); border-bottom-color: var(--green); }
+
+    /* ── Layout ── */
+    main {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    .tab { display: none; }
+    .tab.active { display: block; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 1.6rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .card + .card { margin-top: 1.25rem; }
+    .card h2 {
+      font-size: 1.1rem;
+      color: var(--green);
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.7rem;
+      border-bottom: 2px solid var(--green-pale);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    /* ── Stats ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 1.25rem 1rem;
+      box-shadow: var(--shadow);
+      border-left: 5px solid var(--green);
+      text-align: center;
+    }
+    .stat-val   { font-size: 2rem; font-weight: 800; color: var(--green); line-height: 1; }
+    .stat-label { font-size: 0.76rem; color: var(--gray); margin-top: 5px; text-transform: uppercase; letter-spacing: .5px; }
+
+    /* ── Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1rem;
+    }
+    .form-group { display: flex; flex-direction: column; gap: .4rem; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: .82rem; font-weight: 700; color: #495057; }
+
+    input, select {
+      padding: .6rem .9rem;
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      font-size: .88rem;
+      width: 100%;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      background: #fff;
+    }
+    input:focus, select:focus {
+      border-color: var(--green-light);
+      box-shadow: 0 0 0 3px rgba(82,183,136,.18);
+    }
+    input::placeholder { color: #adb5bd; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: .65rem 1.4rem;
+      border: none;
+      border-radius: 9px;
+      font-size: .88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .btn-primary   { background: var(--green); color: #fff; }
+    .btn-primary:hover { background: var(--green-mid); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(45,106,79,.3); }
+    .btn-secondary { background: var(--blue-light); color: #fff; }
+    .btn-secondary:hover { background: var(--blue); }
+    .btn-ghost  { background: #f1f3f5; color: #495057; }
+    .btn-ghost:hover { background: #e9ecef; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; transform: none !important; }
+
+    /* ── Alerts ── */
+    .alert {
+      padding: .85rem 1.1rem;
+      border-radius: 9px;
+      font-size: .87rem;
+      display: none;
+    }
+    .alert.success { background: var(--green-pale); color: var(--green); border: 1px solid var(--green-light); }
+    .alert.error   { background: #ffe0e0; color: #c0392b; border: 1px solid #f5a0a0; }
+    .alert.info    { background: #e3f2fd; color: var(--blue); border: 1px solid #90caf9; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+    th {
+      background: var(--green-pale);
+      color: var(--green);
+      padding: .7rem 1rem;
+      text-align: left;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    td { padding: .65rem 1rem; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tr:hover td { background: #f8fff9; }
+    .badge {
+      display: inline-block;
+      padding: .18rem .55rem;
+      border-radius: 50px;
+      font-size: .76rem;
+      font-weight: 700;
+      background: var(--green-pale);
+      color: var(--green);
+    }
+    .badge-blue   { background: #dbeafe; color: var(--blue); }
+    .badge-orange { background: #fef3cd; color: #856404; }
+
+    /* ── Member lookup display ── */
+    .member-preview {
+      background: var(--green-pale);
+      border: 1px solid var(--green-light);
+      border-radius: 11px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .member-preview .mp-name   { font-weight: 800; font-size: 1rem; color: var(--green); }
+    .member-preview .mp-detail { font-size: .83rem; color: #495057; margin-top: 4px; }
+    .coll-list {
+      margin-top: .65rem;
+      max-height: 180px;
+      overflow-y: auto;
+      border-top: 1px solid #b7e4c7;
+      padding-top: .5rem;
+    }
+    .coll-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .82rem;
+      padding: .3rem 0;
+      border-bottom: 1px dashed #b7e4c7;
+      color: #333;
+      gap: .5rem;
+    }
+    .edit-btn {
+      padding: .15rem .5rem;
+      font-size: .72rem;
+      background: #f1f3f5;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      color: #495057;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .edit-btn:hover { background: #e2e6ea; }
+    .edit-input {
+      width: 75px;
+      padding: .2rem .4rem;
+      border: 1.5px solid var(--green-light);
+      border-radius: 6px;
+      font-size: .82rem;
+      outline: none;
+    }
+
+    /* ── Map ── */
+    #map {
+      height: 540px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+      margin-top: .85rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: .78rem;
+      color: #555;
+    }
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 2.5rem 1rem; color: var(--gray); font-size: .9rem; }
+    .empty span { font-size: 2.5rem; display: block; margin-bottom: .5rem; }
+
+    /* ── Search ── */
+    .search-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .search-row input { max-width: 280px; }
+
+    /* ── Auth overlay ── */
+    #auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10,25,60,0.72);
+      backdrop-filter: blur(7px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #auth-card {
+      background: #fff;
+      border-radius: 22px;
+      padding: 2.8rem 2.2rem 2.2rem;
+      width: min(420px, 93vw);
+      text-align: center;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+      animation: fadeUp .35s ease;
+    }
+    #auth-card img   { height: 90px; width: auto; margin-bottom: 1rem; }
+    #auth-card h2    { color: var(--green); font-size: 1.4rem; font-weight: 800; margin-bottom: .2rem; }
+    #auth-card .sub  { color: var(--gray); font-size: .85rem; margin-bottom: 1.6rem; }
+    #auth-error      { color: #c0392b; font-size: .82rem; margin-top: .5rem; display: none; }
+    #auth-card .auth-btns { display: flex; gap: .75rem; margin-top: 1.2rem; }
+    #auth-card .auth-btns .btn { flex: 1; justify-content: center; }
+    @keyframes fadeUp  { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:none; } }
+    @keyframes shake   { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-9px)} 40%,80%{transform:translateX(9px)} }
+    .shake { animation: shake .4s ease; }
+
+    /* ── Disabled nav tabs (limited access) ── */
+    .nav-btn.nav-disabled {
+      opacity: .35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* ── Hide address column in limited mode ── */
+    body.limited-access .addr-col { display: none; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      header { padding: .75rem 1rem; }
+      .nav-btn { padding: .85rem .85rem; font-size: .8rem; }
+      .stat-val { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════ AUTH OVERLAY ════════════════════════ -->
+<div id="auth-overlay">
+  <div id="auth-card">
+    <img src="logo.png" alt="Cans for College">
+    <h2>Cans for College</h2>
+    <p class="sub">Associate Management Platform — Enter your password to continue.</p>
+    <div class="form-group" style="text-align:left">
+      <label for="auth-password">Password</label>
+      <input id="auth-password" type="password" placeholder="Enter password…"
+             onkeydown="if(event.key==='Enter')checkPassword()">
+    </div>
+    <div id="auth-error">❌ Incorrect password. Please try again.</div>
+    <div class="auth-btns">
+      <button class="btn btn-primary" onclick="checkPassword()">🔓 Enter</button>
+      <button class="btn btn-ghost"   onclick="skipAccess()">Skip →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════ HEADER ════════════════════════ -->
+<header>
+  <img src="logo.png" alt="Cans for College" style="height:52px;width:auto;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.25))">
+  <div class="header-text">
+    <h1>Cans for College</h1>
+    <p>Community Recycling Program &mdash; Associate Tracking Dashboard</p>
+  </div>
+  <a href="landing.html" style="
+    margin-left:auto;
+    display:inline-flex;
+    align-items:center;
+    gap:.45rem;
+    padding:.55rem 1.2rem;
+    background:rgba(255,255,255,0.15);
+    color:#fff;
+    border:1.5px solid rgba(255,255,255,0.4);
+    border-radius:50px;
+    font-size:.83rem;
+    font-weight:700;
+    text-decoration:none;
+    white-space:nowrap;
+    transition:background .2s;
+  " onmouseover="this.style.background='rgba(255,255,255,0.25)'"
+     onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+    ← Back to Home
+  </a>
+</header>
+
+<!-- ════════════════════════ NAV ════════════════════════ -->
+<nav>
+  <button class="nav-btn active" data-tab="dashboard"  onclick="switchTab(this,'dashboard')">📊 Dashboard</button>
+  <button class="nav-btn" data-tab="associates" onclick="switchTab(this,'associates')">🎓 Associates</button>
+  <button class="nav-btn" data-tab="register"   onclick="switchTab(this,'register')">➕ Register Member</button>
+  <button class="nav-btn" data-tab="log"        onclick="switchTab(this,'log')">📝 Log Collection</button>
+  <button class="nav-btn" data-tab="map"        onclick="switchTab(this,'map')">🗺️ Map View</button>
+  <button class="nav-btn" data-tab="report"     onclick="switchTab(this,'report')">📋 Daily Report</button>
+</nav>
+
+<!-- ════════════════════════ MAIN ════════════════════════ -->
+<main>
+
+  <!-- ─── DASHBOARD ─── -->
+  <div id="tab-dashboard" class="tab active">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="stat-members">0</div>
+        <div class="stat-label">Total Members</div>
+      </div>
+      <div class="stat-card" style="border-left-color:var(--blue)">
+        <div class="stat-val" style="color:var(--blue)" id="stat-weight">0</div>
+        <div class="stat-label">Pounds Collected</div>
+      </div>
+      <div class="stat-card" style="border-left-color:var(--orange)">
+        <div class="stat-val" style="color:var(--orange)" id="stat-collections">0</div>
+        <div class="stat-label">Total Collections</div>
+      </div>
+      <div class="stat-card" style="border-left-color:var(--purple)">
+        <div class="stat-val" style="color:var(--purple)" id="stat-avg">0</div>
+        <div class="stat-label">Avg lbs / Member</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>👥 Member Directory</h2>
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Search name, ID, or address…" oninput="renderTable()">
+        <span id="member-count-label" style="font-size:.82rem;color:var(--gray)"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Associate</th>
+              <th class="addr-col">Address</th>
+              <th>Pickup Day</th>
+              <th>Total Weight</th>
+              <th>Collections</th>
+              <th>On Map</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── ASSOCIATES ─── -->
+  <div id="tab-associates" class="tab">
+    <div class="card">
+      <h2>🎓 Register New Associate</h2>
+      <form id="associate-form" onsubmit="registerAssociate(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="assoc-first">First Name *</label>
+            <input id="assoc-first" type="text" required placeholder="Alex">
+          </div>
+          <div class="form-group">
+            <label for="assoc-last">Last Name *</label>
+            <input id="assoc-last" type="text" required placeholder="Johnson">
+          </div>
+          <div class="form-group">
+            <label for="assoc-phone">Phone Number *</label>
+            <input id="assoc-phone" type="tel" required placeholder="(281) 555-0100">
+          </div>
+        </div>
+        <div style="margin-top:1.4rem;display:flex;gap:.75rem;flex-wrap:wrap">
+          <button type="submit" class="btn btn-primary" id="assoc-btn">🎓 Register Associate</button>
+          <button type="button" class="btn btn-ghost" id="assoc-cancel-btn" style="display:none" onclick="cancelAssociateEdit()">✕ Cancel Edit</button>
+          <button type="reset" class="btn btn-ghost" id="assoc-clear-btn">Clear</button>
+        </div>
+      </form>
+      <div class="alert success" id="assoc-success" style="margin-top:1rem"></div>
+      <div class="alert error"   id="assoc-error"   style="margin-top:1rem"></div>
+    </div>
+
+    <div class="card">
+      <h2>🎓 Associate Directory</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Associate ID</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Members Registered</th>
+              <th>Total Weight</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="assoc-table-body">
+            <tr><td colspan="6"><div class="empty"><span>🎓</span>No associates registered yet.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── REGISTER ─── -->
+  <div id="tab-register" class="tab">
+    <div class="card">
+      <h2>➕ Register New Community Member</h2>
+      <form id="register-form" onsubmit="registerMember(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="reg-first">First Name *</label>
+            <input id="reg-first" type="text" required placeholder="Jane">
+          </div>
+          <div class="form-group">
+            <label for="reg-last">Last Name *</label>
+            <input id="reg-last" type="text" required placeholder="Smith">
+          </div>
+          <div class="form-group full">
+            <label for="reg-address">Full Street Address *</label>
+            <input id="reg-address" type="text" required placeholder="123 Main St, Springfield, IL 62701">
+          </div>
+          <div class="form-group">
+            <label for="reg-phone">Phone Number</label>
+            <input id="reg-phone" type="tel" placeholder="(555) 123-4567">
+          </div>
+          <div class="form-group">
+            <label for="reg-email">Email Address</label>
+            <input id="reg-email" type="email" placeholder="jane@example.com">
+          </div>
+          <div class="form-group">
+            <label for="reg-day">Pickup Day *</label>
+            <select id="reg-day" required>
+              <option value="">Select a day…</option>
+              <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+              <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="reg-associate">Associate ID *</label>
+            <select id="reg-associate" required>
+              <option value="">Select associate…</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:1.4rem;display:flex;gap:.75rem;flex-wrap:wrap">
+          <button type="submit" class="btn btn-primary" id="reg-btn">Register Member</button>
+          <button type="button" class="btn btn-ghost" onclick="cancelMemberEdit()" id="reg-cancel-btn" style="display:none">✕ Cancel Edit</button>
+          <button type="reset"  class="btn btn-ghost" id="reg-clear-btn">Clear Form</button>
+        </div>
+      </form>
+      <div class="alert success" id="reg-success" style="margin-top:1rem"></div>
+      <div class="alert error"   id="reg-error"   style="margin-top:1rem"></div>
+    </div>
+
+    <div class="card">
+      <h2>👥 Registered Members</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Pickup Day</th><th>Phone</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="reg-members-body">
+            <tr><td colspan="5"><div class="empty"><span>📭</span>No members registered yet.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── LOG COLLECTION ─── -->
+  <div id="tab-log" class="tab">
+    <div class="card">
+      <h2>📝 Log Can Collection</h2>
+
+      <div style="margin-bottom:1.4rem">
+        <label style="display:block;margin-bottom:.5rem;font-size:.82rem;font-weight:700;color:#495057">Look Up Member by ID</label>
+        <div style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap">
+          <div class="form-group" style="flex:0 0 200px">
+            <input id="lookup-id" type="number" placeholder="e.g. 1001" min="1000">
+          </div>
+          <button class="btn btn-secondary" onclick="lookupMember()">Look Up</button>
+          <button class="btn btn-ghost" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="alert error" id="lookup-error" style="margin-top:.6rem;max-width:400px"></div>
+      </div>
+
+      <div class="member-preview" id="member-preview">
+        <div class="mp-name"   id="mp-name"></div>
+        <div class="mp-detail" id="mp-detail"></div>
+        <div class="coll-list" id="mp-history"></div>
+      </div>
+
+      <form id="log-form" onsubmit="logCollection(event)" style="display:none">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="log-date">Collection Date *</label>
+            <input id="log-date" type="date" required>
+          </div>
+          <div class="form-group">
+            <label for="log-weight">Net Weight (lbs) *</label>
+            <input id="log-weight" type="number" required min="0.1" step="0.1" placeholder="e.g. 12.5">
+          </div>
+        </div>
+        <div style="margin-top:1.2rem;display:flex;gap:.75rem">
+          <button type="submit" class="btn btn-primary">✅ Log Collection</button>
+        </div>
+      </form>
+
+      <div class="alert success" id="log-success" style="margin-top:1rem"></div>
+    </div>
+  </div>
+
+  <!-- ─── DAILY REPORT ─── -->
+  <div id="tab-report" class="tab">
+    <div class="card">
+      <h2>📋 Daily Collection Report</h2>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1.5rem">
+        <div class="form-group" style="flex:0 0 200px">
+          <label for="report-day">Pickup Day</label>
+          <select id="report-day" onchange="renderReport()">
+            <option value="">Select a day…</option>
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+            <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:0 0 240px">
+          <label for="report-associate">Filter by Associate</label>
+          <select id="report-associate" onchange="renderReport()">
+            <option value="">All Associates</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost" onclick="printReport()">🖨️ Print Report</button>
+      </div>
+
+      <div id="report-summary" style="display:none;margin-bottom:1rem">
+        <div class="stats-grid" style="margin-bottom:0">
+          <div class="stat-card">
+            <div class="stat-val" id="rpt-count">0</div>
+            <div class="stat-label">Houses to Collect</div>
+          </div>
+          <div class="stat-card" style="border-left-color:var(--blue)">
+            <div class="stat-val" style="color:var(--blue)" id="rpt-associates">0</div>
+            <div class="stat-label">Associates on Route</div>
+          </div>
+          <div class="stat-card" style="border-left-color:var(--orange)">
+            <div class="stat-val" style="color:var(--orange)" id="rpt-weight">0</div>
+            <div class="stat-label">Total lbs So Far</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="report-empty" class="empty" style="padding:2rem">
+        <span>📋</span>Select a day above to see the collection list.
+      </div>
+
+      <div id="report-table-wrap" class="table-wrap" style="display:none">
+        <table id="report-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Member ID</th>
+              <th>Member Name</th>
+              <th class="addr-col">Address</th>
+              <th>Associate</th>
+              <th>Last Collection</th>
+              <th>Total Weight</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="report-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── MAP ─── -->
+  <div id="tab-map" class="tab">
+    <div class="card">
+      <h2>🗺️ Pickup Location Map</h2>
+      <p style="font-size:.84rem;color:var(--gray);margin-bottom:1rem">
+        Click any marker to see member details. Marker color indicates pickup day.
+      </p>
+      <div id="map"></div>
+      <div class="map-legend" id="map-legend"></div>
+      <div class="alert info" id="map-no-members" style="margin-top:1rem">
+        No geocoded members yet. Register members with valid addresses to see them on the map.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ════════════════════════ SCRIPTS ════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+
+// ── Associate color palette ───────────────────────────────────────────────────
+const ASSOC_PALETTE = [
+  '#e74c3c','#3498db','#f39c12','#9b59b6','#1abc9c',
+  '#e67e22','#2ecc71','#e91e63','#00bcd4','#ff5722',
+  '#8e44ad','#16a085','#d35400','#2980b9','#27ae60',
+];
+function assocColor(assocId) {
+  if (!assocId) return '#888';
+  const associates = ADB.all();
+  const idx = associates.findIndex(a => a.id === assocId);
+  return ASSOC_PALETTE[idx >= 0 ? idx % ASSOC_PALETTE.length : 0];
+}
+
+// ── LocalStorage DB ───────────────────────────────────────────────────────────
+const DB = {
+  _key: 'cfc_members',
+  all()  { return JSON.parse(localStorage.getItem(this._key) || '[]'); },
+  save(arr) { localStorage.setItem(this._key, JSON.stringify(arr)); },
+  nextId() {
+    const m = this.all();
+    return m.length === 0 ? 1001 : Math.max(...m.map(x => x.id)) + 1;
+  },
+  add(member)    { const m = this.all(); m.push(member); this.save(m); },
+  find(id)       { return this.all().find(m => m.id === id) || null; },
+  update(member) {
+    const m = this.all();
+    const i = m.findIndex(x => x.id === member.id);
+    if (i !== -1) { m[i] = member; this.save(m); return true; }
+    return false;
+  },
+};
+
+// ── Associates DB ─────────────────────────────────────────────────────────────
+const ADB = {
+  _key: 'cfc_associates',
+  all()  { return JSON.parse(localStorage.getItem(this._key) || '[]'); },
+  save(arr) { localStorage.setItem(this._key, JSON.stringify(arr)); },
+  nextId() {
+    const a = this.all();
+    if (a.length === 0) return 'A001';
+    const nums = a.map(x => parseInt(x.id.slice(1)));
+    return 'A' + String(Math.max(...nums) + 1).padStart(3, '0');
+  },
+  add(assoc)   { const a = this.all(); a.push(assoc); this.save(a); },
+  find(id)     { return this.all().find(a => a.id === id) || null; },
+  delete(id)   { this.save(this.all().filter(a => a.id !== id)); },
+};
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+const PASSWORD = 'CansForCollege2026';
+const RESTRICTED_TABS = ['associates', 'log', 'report'];
+
+function checkPassword() {
+  const val = document.getElementById('auth-password').value;
+  if (val === PASSWORD) {
+    applyAccess('full');
+  } else {
+    const card = document.getElementById('auth-card');
+    card.classList.remove('shake');
+    void card.offsetWidth; // reflow to restart animation
+    card.classList.add('shake');
+    document.getElementById('auth-error').style.display = 'block';
+    document.getElementById('auth-password').value = '';
+    document.getElementById('auth-password').focus();
+  }
+}
+
+function skipAccess() {
+  applyAccess('limited');
+}
+
+function applyAccess(level) {
+  document.getElementById('auth-overlay').style.display = 'none';
+  if (level === 'limited') {
+    document.body.classList.add('limited-access');
+    RESTRICTED_TABS.forEach(tab => {
+      const btn = document.querySelector(`.nav-btn[data-tab="${tab}"]`);
+      if (btn) btn.classList.add('nav-disabled');
+    });
+  }
+  // Navigate to URL hash tab if present (e.g. index.html#register)
+  const hash = window.location.hash.replace('#', '');
+  if (hash) {
+    const btn = document.querySelector(`.nav-btn[data-tab="${hash}"]`);
+    if (btn && !btn.classList.contains('nav-disabled')) {
+      switchTab(btn, hash);
+    }
+  }
+}
+
+// ── Tab navigation ────────────────────────────────────────────────────────────
+function switchTab(btn, name) {
+  if (btn.classList.contains('nav-disabled')) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'dashboard')  { updateStats(); renderTable(); }
+  if (name === 'associates') { renderAssocTable(); }
+  if (name === 'register')   { populateAssocDropdown(); renderRegMembers(); }
+  if (name === 'map')        { setTimeout(renderMap, 80); }
+  if (name === 'report')     { populateReportAssocFilter(); renderReport(); }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function showAlert(id, msg, type) {
+  const el = document.getElementById(id);
+  el.className = 'alert ' + type;
+  el.innerHTML = msg;
+  el.style.display = 'block';
+}
+function hideAlert(id) { document.getElementById(id).style.display = 'none'; }
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function updateStats() {
+  const members = DB.all();
+  const weight = members.reduce((s, m) => s + m.totalWeight, 0);
+  const colls  = members.reduce((s, m) => s + m.collections.length, 0);
+  const avg    = members.length ? (weight / members.length).toFixed(1) : 0;
+  document.getElementById('stat-members').textContent    = members.length;
+  document.getElementById('stat-weight').textContent     = weight.toFixed(1);
+  document.getElementById('stat-collections').textContent = colls;
+  document.getElementById('stat-avg').textContent        = avg;
+}
+
+function renderTable() {
+  const q = (document.getElementById('search-input').value || '').toLowerCase();
+  const members = DB.all().filter(m =>
+    `${m.id} ${m.firstName} ${m.lastName} ${m.address} ${m.associateId || ''}`.toLowerCase().includes(q)
+  );
+  const label = document.getElementById('member-count-label');
+  label.textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('table-body');
+  if (members.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>📭</span>No members found. Use "Register Member" to add one.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = members.map(m => {
+    const assoc = m.associateId ? ADB.find(m.associateId) : null;
+    const assocLabel = assoc
+      ? `<span class="badge" style="background:#e8f4fd;color:var(--blue)">${esc(assoc.id)}<br><small>${esc(assoc.firstName)} ${esc(assoc.lastName)}</small></span>`
+      : '<span style="color:#ccc">—</span>';
+    return `
+    <tr>
+      <td><span class="badge">#${m.id}</span></td>
+      <td><strong>${esc(m.firstName)} ${esc(m.lastName)}</strong></td>
+      <td>${assocLabel}</td>
+      <td class="addr-col" style="color:var(--gray);font-size:.81rem">${esc(m.address)}</td>
+      <td><span class="badge badge-blue">${esc(m.pickupDay)}</span></td>
+      <td><strong>${m.totalWeight.toFixed(1)} lbs</strong></td>
+      <td><span class="badge badge-orange">${m.collections.length}</span></td>
+      <td style="text-align:center">${m.coordinates ? '📍' : '<span style="color:#ccc">—</span>'}</td>
+    </tr>
+  `; }).join('');
+}
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ── Geocoding (Nominatim) ─────────────────────────────────────────────────────
+async function geocode(address) {
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='
+              + encodeURIComponent(address);
+    const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await res.json();
+    if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch (_) {}
+  return null;
+}
+
+// ── Register Member ───────────────────────────────────────────────────────────
+let _editingMemberId = null;
+
+async function registerMember(e) {
+  e.preventDefault();
+  hideAlert('reg-success');
+  hideAlert('reg-error');
+
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+
+  const firstName   = document.getElementById('reg-first').value.trim();
+  const lastName    = document.getElementById('reg-last').value.trim();
+  const address     = document.getElementById('reg-address').value.trim();
+  const phone       = document.getElementById('reg-phone').value.trim();
+  const email       = document.getElementById('reg-email').value.trim();
+  const pickupDay   = document.getElementById('reg-day').value;
+  const associateId = document.getElementById('reg-associate').value;
+
+  // ── Edit existing member ──
+  if (_editingMemberId !== null) {
+    btn.innerHTML = 'Saving… <span class="spinner"></span>';
+    const existing = DB.find(_editingMemberId);
+    const needsGeocode = address !== existing.address;
+    const coords = needsGeocode ? await geocode(address) : existing.coordinates;
+
+    existing.firstName   = firstName;
+    existing.lastName    = lastName;
+    existing.address     = address;
+    existing.phone       = phone;
+    existing.email       = email;
+    existing.pickupDay   = pickupDay;
+    existing.associateId = associateId;
+    if (needsGeocode) existing.coordinates = coords;
+    DB.update(existing);
+
+    btn.disabled = false;
+    cancelMemberEdit();
+    renderRegMembers();
+    updateStats();
+    renderTable();
+    showAlert('reg-success',
+      `✅ <strong>${esc(firstName)} ${esc(lastName)}</strong> updated successfully!${needsGeocode && !coords ? '<br><small>⚠️ New address could not be geocoded.</small>' : ''}`,
+      'success');
+    return;
+  }
+
+  // ── New member ──
+  btn.innerHTML = 'Registering… <span class="spinner"></span>';
+  const coords = await geocode(address);
+
+  const member = {
+    id:           DB.nextId(),
+    firstName, lastName, address, phone, email, pickupDay, associateId,
+    coordinates:  coords,
+    totalWeight:  0,
+    collections:  [],
+    registeredAt: new Date().toISOString(),
+  };
+
+  DB.add(member);
+  btn.disabled = false;
+  btn.innerHTML = 'Register Member';
+  e.target.reset();
+  renderRegMembers();
+
+  const mapNote = coords
+    ? `📍 Pinned on map (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`
+    : `⚠️ Address could not be geocoded — member saved without map pin.`;
+
+  showAlert('reg-success',
+    `✅ <strong>${esc(member.firstName)} ${esc(member.lastName)}</strong> registered! Member ID: <strong>#${member.id}</strong><br>
+     <small style="opacity:.85">${mapNote}</small>`,
+    'success');
+}
+
+function editMember(id) {
+  const m = DB.find(id);
+  if (!m) return;
+  _editingMemberId = id;
+  populateAssocDropdown();
+  document.getElementById('reg-first').value       = m.firstName;
+  document.getElementById('reg-last').value        = m.lastName;
+  document.getElementById('reg-address').value     = m.address;
+  document.getElementById('reg-phone').value       = m.phone || '';
+  document.getElementById('reg-email').value       = m.email || '';
+  document.getElementById('reg-day').value         = m.pickupDay;
+  document.getElementById('reg-associate').value   = m.associateId || '';
+  const btn = document.getElementById('reg-btn');
+  btn.textContent = '💾 Save Changes';
+  btn.style.background = 'var(--blue-light)';
+  document.getElementById('reg-cancel-btn').style.display = 'inline-flex';
+  document.getElementById('reg-clear-btn').style.display  = 'none';
+  hideAlert('reg-success');
+  hideAlert('reg-error');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelMemberEdit() {
+  _editingMemberId = null;
+  document.getElementById('register-form').reset();
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = false;
+  btn.textContent = 'Register Member';
+  btn.style.background = '';
+  document.getElementById('reg-cancel-btn').style.display = 'none';
+  document.getElementById('reg-clear-btn').style.display  = 'inline-flex';
+}
+
+function deleteMember(id) {
+  const m = DB.find(id);
+  if (!m) return;
+  if (!confirm(`Delete ${m.firstName} ${m.lastName} (#${m.id}) and all their collections? This cannot be undone.`)) return;
+  DB.save(DB.all().filter(x => x.id !== id));
+  if (_editingMemberId === id) cancelMemberEdit();
+  renderRegMembers();
+  updateStats();
+  renderTable();
+  showAlert('reg-success', `🗑️ <strong>${esc(m.firstName)} ${esc(m.lastName)}</strong> has been removed.`, 'success');
+  setTimeout(() => hideAlert('reg-success'), 4000);
+}
+
+function renderRegMembers() {
+  const tbody = document.getElementById('reg-members-body');
+  if (!tbody) return;
+  const members = DB.all();
+  if (members.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span>📭</span>No members registered yet.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = members.map(m => `
+    <tr>
+      <td><span class="badge">#${m.id}</span></td>
+      <td><strong>${esc(m.firstName)} ${esc(m.lastName)}</strong></td>
+      <td><span class="badge badge-blue">${esc(m.pickupDay)}</span></td>
+      <td style="color:var(--gray)">${esc(m.phone || '—')}</td>
+      <td>
+        <div style="display:flex;gap:.4rem">
+          <button class="btn btn-secondary" style="padding:.3rem .75rem;font-size:.78rem" onclick="editMember(${m.id})">✏️ Edit</button>
+          <button class="btn" style="background:#e74c3c;color:#fff;padding:.3rem .75rem;font-size:.78rem;border-radius:9px" onclick="deleteMember(${m.id})">🗑️ Delete</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+// ── Log Collection ────────────────────────────────────────────────────────────
+let _activeId = null;
+
+function lookupMember() {
+  const id = parseInt(document.getElementById('lookup-id').value, 10);
+  hideAlert('lookup-error');
+  document.getElementById('member-preview').style.display = 'none';
+  document.getElementById('log-form').style.display = 'none';
+  hideAlert('log-success');
+
+  if (!id) {
+    showAlert('lookup-error', 'Please enter a Member ID (e.g. 1001).', 'error');
+    return;
+  }
+  const member = DB.find(id);
+  if (!member) {
+    showAlert('lookup-error', `No member found with ID <strong>#${id}</strong>.`, 'error');
+    return;
+  }
+
+  _activeId = id;
+  document.getElementById('mp-name').textContent =
+    `${member.firstName} ${member.lastName}  —  #${member.id}`;
+  const assoc = member.associateId ? ADB.find(member.associateId) : null;
+  const assocText = assoc ? `🎓 Associate: ${assoc.firstName} ${assoc.lastName} (${assoc.id})  |  ` : '';
+  document.getElementById('mp-detail').textContent =
+    `${assocText}📍 ${member.address}  |  📅 Pickup: ${member.pickupDay}  |  ⚖️ Total: ${member.totalWeight.toFixed(1)} lbs  |  📦 ${member.collections.length} collection(s)`;
+
+  const hist = member.collections.map((c, i) => ({ ...c, _idx: i })).reverse();
+  const histEl = document.getElementById('mp-history');
+  histEl.innerHTML = hist.length === 0
+    ? '<div style="color:var(--gray);font-size:.82rem;padding:.4rem 0">No collections logged yet.</div>'
+    : hist.map(c => `
+        <div class="coll-item" id="coll-row-${c._idx}">
+          <span>${c.date}</span>
+          <strong>${c.weight} lbs</strong>
+          <span style="display:flex;gap:.3rem;flex-shrink:0">
+            <button class="edit-btn" onclick="editCollection(${c._idx})">✏️ Edit</button>
+            <button class="edit-btn" style="background:#ffe0e0;border-color:#f5a0a0;color:#c0392b" onclick="deleteCollection(${c._idx})">🗑️ Delete</button>
+          </span>
+        </div>`).join('');
+
+  document.getElementById('member-preview').style.display = 'block';
+  document.getElementById('log-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('log-form').style.display = 'block';
+}
+
+function logCollection(e) {
+  e.preventDefault();
+  if (!_activeId) return;
+
+  const date   = document.getElementById('log-date').value;
+  const weight = parseFloat(document.getElementById('log-weight').value);
+  const member = DB.find(_activeId);
+  if (!member) return;
+
+  member.collections.push({ date, weight });
+  member.totalWeight = parseFloat((member.totalWeight + weight).toFixed(2));
+  DB.update(member);
+  document.getElementById('log-weight').value = '';
+
+  // Refresh preview
+  lookupMember();
+
+  showAlert('log-success',
+    `✅ Logged <strong>${weight} lbs</strong> for <strong>${esc(member.firstName)} ${esc(member.lastName)}</strong>
+     on ${date}. New total: <strong>${member.totalWeight.toFixed(1)} lbs</strong>.`,
+    'success');
+  setTimeout(() => hideAlert('log-success'), 5000);
+}
+
+function editCollection(origIdx) {
+  const member = DB.find(_activeId);
+  if (!member) return;
+  const c = member.collections[origIdx];
+  const row = document.getElementById(`coll-row-${origIdx}`);
+  row.innerHTML = `
+    <span>${c.date}</span>
+    <input class="edit-input" id="edit-w-${origIdx}" type="number" value="${c.weight}" min="0.1" step="0.1">
+    <span style="display:flex;gap:.3rem;flex-shrink:0">
+      <button class="btn btn-primary" style="padding:.18rem .6rem;font-size:.72rem" onclick="saveEdit(${origIdx})">Save</button>
+      <button class="btn btn-ghost"   style="padding:.18rem .6rem;font-size:.72rem" onclick="lookupMember()">Cancel</button>
+    </span>`;
+  document.getElementById(`edit-w-${origIdx}`).focus();
+}
+
+function saveEdit(origIdx) {
+  const input = document.getElementById(`edit-w-${origIdx}`);
+  const newWeight = parseFloat(input.value);
+  if (!newWeight || newWeight <= 0) { input.style.borderColor = '#e74c3c'; return; }
+
+  const member = DB.find(_activeId);
+  if (!member) return;
+
+  const oldWeight = member.collections[origIdx].weight;
+  member.collections[origIdx].weight = newWeight;
+  member.totalWeight = parseFloat((member.totalWeight - oldWeight + newWeight).toFixed(2));
+  DB.update(member);
+
+  lookupMember();
+  showAlert('log-success',
+    `✅ Updated: ${member.collections[origIdx].date} changed from <strong>${oldWeight} lbs</strong> → <strong>${newWeight} lbs</strong>. New total: <strong>${member.totalWeight.toFixed(1)} lbs</strong>.`,
+    'success');
+  setTimeout(() => hideAlert('log-success'), 5000);
+}
+
+function deleteCollection(origIdx) {
+  const member = DB.find(_activeId);
+  if (!member) return;
+  const c = member.collections[origIdx];
+  if (!confirm(`Delete the ${c.weight} lbs collection on ${c.date}? This cannot be undone.`)) return;
+  member.totalWeight = parseFloat((member.totalWeight - c.weight).toFixed(2));
+  member.collections.splice(origIdx, 1);
+  DB.update(member);
+  lookupMember();
+  showAlert('log-success',
+    `🗑️ Collection of <strong>${c.weight} lbs</strong> on ${c.date} removed. New total: <strong>${member.totalWeight.toFixed(1)} lbs</strong>.`,
+    'success');
+  setTimeout(() => hideAlert('log-success'), 5000);
+}
+
+function clearLog() {
+  _activeId = null;
+  document.getElementById('lookup-id').value = '';
+  document.getElementById('member-preview').style.display = 'none';
+  document.getElementById('log-form').style.display = 'none';
+  hideAlert('lookup-error');
+  hideAlert('log-success');
+}
+
+// ── Map ───────────────────────────────────────────────────────────────────────
+let _map     = null;
+let _markers = [];
+
+function pinIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:28px;height:28px;border-radius:50% 50% 50% 0;
+      background:${color};border:3px solid #fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.35);
+      transform:rotate(-45deg);
+    "></div>`,
+    iconSize:   [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor:[0, -32],
+  });
+}
+
+function renderMap() {
+  const members = DB.all().filter(m => m.coordinates);
+  const noMsgEl = document.getElementById('map-no-members');
+
+  if (!_map) {
+    const center = members.length > 0
+      ? [members[0].coordinates.lat, members[0].coordinates.lng]
+      : [30.1658, -95.4613]; // The Woodlands, TX
+    _map = L.map('map').setView(center, members.length > 0 ? 13 : 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(_map);
+  }
+
+  _markers.forEach(m => m.remove());
+  _markers = [];
+
+  noMsgEl.style.display = members.length === 0 ? 'block' : 'none';
+  if (members.length === 0) return;
+
+  const bounds = [];
+  members.forEach(member => {
+    const { lat, lng } = member.coordinates;
+    bounds.push([lat, lng]);
+    const color = assocColor(member.associateId);
+    const assoc = member.associateId ? ADB.find(member.associateId) : null;
+    const assocName = assoc ? `${assoc.firstName} ${assoc.lastName} (${assoc.id})` : 'Unassigned';
+
+    const popup = `
+      <div style="font-family:system-ui;min-width:220px;line-height:1.5">
+        <div style="font-weight:800;font-size:1rem;color:#1e7e34;border-bottom:2px solid #d4edda;padding-bottom:.4rem;margin-bottom:.5rem">
+          ${esc(member.firstName)} ${esc(member.lastName)}
+        </div>
+        <table style="font-size:.8rem;width:100%;border-collapse:collapse">
+          <tr><td style="color:#888;padding:2px 10px 2px 0;white-space:nowrap">Member ID</td>   <td><strong>#${member.id}</strong></td></tr>
+          <tr><td style="color:#888;padding:2px 10px 2px 0;white-space:nowrap">Associate</td>   <td><span style="background:${color};color:#fff;padding:1px 7px;border-radius:50px;font-size:.75rem">${esc(assocName)}</span></td></tr>
+          <tr><td style="color:#888;padding:2px 10px 2px 0">Pickup Day</td>  <td>${esc(member.pickupDay)}</td></tr>
+          <tr><td style="color:#888;padding:2px 10px 2px 0">Address</td>     <td style="font-size:.76rem">${esc(member.address)}</td></tr>
+          <tr><td style="color:#888;padding:2px 10px 2px 0">Collections</td> <td>${member.collections.length}</td></tr>
+          <tr><td style="color:#888;padding:2px 10px 2px 0">Total Weight</td><td><strong>${member.totalWeight.toFixed(1)} lbs</strong></td></tr>
+        </table>
+      </div>`;
+
+    const marker = L.marker([lat, lng], { icon: pinIcon(color) }).bindPopup(popup, { maxWidth: 260 });
+    marker.addTo(_map);
+    _markers.push(marker);
+  });
+
+  if (bounds.length > 1) _map.fitBounds(bounds, { padding: [50, 50] });
+  else _map.setView(bounds[0], 14);
+
+  // Legend — one entry per associate that has at least one geocoded member
+  const usedAssocIds = [...new Set(members.map(m => m.associateId).filter(Boolean))];
+  const legendEl = document.getElementById('map-legend');
+  const unassigned = members.some(m => !m.associateId);
+  legendEl.innerHTML =
+    usedAssocIds.map(id => {
+      const a = ADB.find(id);
+      const label = a ? `${a.firstName} ${a.lastName} (${id})` : id;
+      return `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${assocColor(id)}"></div>
+          ${esc(label)}
+        </div>`;
+    }).join('') +
+    (unassigned ? `<div class="legend-item"><div class="legend-dot" style="background:#888"></div>Unassigned</div>` : '');
+}
+
+// ── Associates ────────────────────────────────────────────────────────────────
+let _editingAssocId = null;
+
+function registerAssociate(e) {
+  e.preventDefault();
+  hideAlert('assoc-success');
+  hideAlert('assoc-error');
+
+  const firstName = document.getElementById('assoc-first').value.trim();
+  const lastName  = document.getElementById('assoc-last').value.trim();
+  const phone     = document.getElementById('assoc-phone').value.trim();
+
+  // ── Edit mode ──
+  if (_editingAssocId !== null) {
+    const existing = ADB.find(_editingAssocId);
+    if (!existing) return;
+    existing.firstName = firstName;
+    existing.lastName  = lastName;
+    existing.phone     = phone;
+    ADB.save(ADB.all().map(a => a.id === _editingAssocId ? existing : a));
+    cancelAssociateEdit();
+    renderAssocTable();
+    populateAssocDropdown();
+    showAlert('assoc-success',
+      `✅ <strong>${esc(firstName)} ${esc(lastName)}</strong> (${esc(existing.id)}) updated successfully.`,
+      'success');
+    return;
+  }
+
+  // ── New associate ──
+  const assoc = {
+    id: ADB.nextId(),
+    firstName, lastName, phone,
+    registeredAt: new Date().toISOString(),
+  };
+
+  ADB.add(assoc);
+  e.target.reset();
+  renderAssocTable();
+  populateAssocDropdown();
+
+  showAlert('assoc-success',
+    `✅ <strong>${esc(firstName)} ${esc(lastName)}</strong> registered as Associate <strong>${assoc.id}</strong>.`,
+    'success');
+}
+
+function editAssociate(id) {
+  const a = ADB.find(id);
+  if (!a) return;
+  _editingAssocId = id;
+  document.getElementById('assoc-first').value = a.firstName;
+  document.getElementById('assoc-last').value  = a.lastName;
+  document.getElementById('assoc-phone').value = a.phone || '';
+  const btn = document.getElementById('assoc-btn');
+  btn.textContent = '💾 Save Changes';
+  btn.style.background = 'var(--blue-light)';
+  document.getElementById('assoc-cancel-btn').style.display = 'inline-flex';
+  document.getElementById('assoc-clear-btn').style.display  = 'none';
+  hideAlert('assoc-success');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelAssociateEdit() {
+  _editingAssocId = null;
+  document.getElementById('associate-form').reset();
+  const btn = document.getElementById('assoc-btn');
+  btn.textContent = '🎓 Register Associate';
+  btn.style.background = '';
+  document.getElementById('assoc-cancel-btn').style.display = 'none';
+  document.getElementById('assoc-clear-btn').style.display  = 'inline-flex';
+}
+
+function renderAssocTable() {
+  const tbody = document.getElementById('assoc-table-body');
+  if (!tbody) return;
+  const associates = ADB.all();
+  const members    = DB.all();
+
+  if (associates.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><span>🎓</span>No associates registered yet.</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = associates.map(a => {
+    const myMembers = members.filter(m => m.associateId === a.id);
+    const totalWeight = myMembers.reduce((s, m) => s + m.totalWeight, 0);
+    return `
+      <tr>
+        <td><span class="badge" style="background:#e8f4fd;color:var(--blue)">${esc(a.id)}</span></td>
+        <td><strong>${esc(a.firstName)} ${esc(a.lastName)}</strong></td>
+        <td style="color:var(--gray)">${esc(a.phone || '—')}</td>
+        <td><span class="badge badge-orange">${myMembers.length}</span></td>
+        <td><strong>${totalWeight.toFixed(1)} lbs</strong></td>
+        <td>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <button class="btn btn-secondary" style="padding:.3rem .75rem;font-size:.78rem"
+              onclick="viewAssociateMembers('${a.id}')">👥 Members</button>
+            <button class="btn btn-primary" style="padding:.3rem .75rem;font-size:.78rem"
+              onclick="editAssociate('${a.id}')">✏️ Edit</button>
+            <button class="btn" style="background:#e74c3c;color:#fff;padding:.3rem .75rem;font-size:.78rem;border-radius:9px"
+              onclick="deleteAssociate('${a.id}')">🗑️ Delete</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function populateAssocDropdown() {
+  const sel = document.getElementById('reg-associate');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select associate…</option>'
+    + ADB.all().map(a =>
+        `<option value="${esc(a.id)}">${esc(a.id)} — ${esc(a.firstName)} ${esc(a.lastName)}</option>`
+      ).join('');
+  if (current) sel.value = current;
+}
+
+function viewAssociateMembers(assocId) {
+  const assoc = ADB.find(assocId);
+  if (!assoc) return;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('[data-tab="dashboard"]')[0].classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-dashboard').classList.add('active');
+  document.getElementById('search-input').value = assocId;
+  updateStats();
+  renderTable();
+}
+
+function deleteAssociate(id) {
+  const a = ADB.find(id);
+  if (!a) return;
+  const count = DB.all().filter(m => m.associateId === id).length;
+  const warn  = count > 0 ? ` This associate has ${count} registered member(s) — they will remain but lose their associate link.` : '';
+  if (!confirm(`Delete Associate ${id} — ${a.firstName} ${a.lastName}?${warn}`)) return;
+  ADB.delete(id);
+  renderAssocTable();
+  populateAssocDropdown();
+  updateStats();
+  renderTable();
+}
+
+// ── Daily Report ──────────────────────────────────────────────────────────────
+function populateReportAssocFilter() {
+  const sel = document.getElementById('report-associate');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All Associates</option>'
+    + ADB.all().map(a =>
+        `<option value="${esc(a.id)}">${esc(a.id)} — ${esc(a.firstName)} ${esc(a.lastName)}</option>`
+      ).join('');
+  if (current) sel.value = current;
+}
+
+function renderReport() {
+  const day      = document.getElementById('report-day').value;
+  const assocId  = document.getElementById('report-associate').value;
+  const emptyEl  = document.getElementById('report-empty');
+  const tableWrap= document.getElementById('report-table-wrap');
+  const summaryEl= document.getElementById('report-summary');
+
+  if (!day) {
+    emptyEl.innerHTML  = '<span>📋</span>Select a day above to see the collection list.';
+    emptyEl.style.display   = 'block';
+    tableWrap.style.display = 'none';
+    summaryEl.style.display = 'none';
+    return;
+  }
+
+  let members = DB.all().filter(m => m.pickupDay === day);
+  if (assocId) members = members.filter(m => m.associateId === assocId);
+
+  summaryEl.style.display = 'block';
+
+  if (members.length === 0) {
+    emptyEl.innerHTML  = `<span>🏠</span>No houses scheduled for ${day}${assocId ? ' under this associate' : ''}.`;
+    emptyEl.style.display   = 'block';
+    tableWrap.style.display = 'none';
+    document.getElementById('rpt-count').textContent      = 0;
+    document.getElementById('rpt-associates').textContent = 0;
+    document.getElementById('rpt-weight').textContent     = '0.0';
+    return;
+  }
+
+  emptyEl.style.display   = 'none';
+  tableWrap.style.display = 'block';
+
+  // Summary stats
+  const uniqueAssocs = new Set(members.map(m => m.associateId).filter(Boolean));
+  const totalWeight  = members.reduce((s, m) => s + m.totalWeight, 0);
+  document.getElementById('rpt-count').textContent      = members.length;
+  document.getElementById('rpt-associates').textContent = uniqueAssocs.size;
+  document.getElementById('rpt-weight').textContent     = totalWeight.toFixed(1);
+
+  // Group by associate for row coloring
+  const assocList = ADB.all();
+
+  document.getElementById('report-body').innerHTML = members.map((m, i) => {
+    const assoc      = m.associateId ? ADB.find(m.associateId) : null;
+    const assocName  = assoc ? `${assoc.firstName} ${assoc.lastName}` : '—';
+    const assocBadge = assoc
+      ? `<span class="badge" style="background:${assocColor(m.associateId)};color:#fff">${esc(assoc.id)}</span><br>
+         <small style="color:var(--gray)">${esc(assocName)}</small>`
+      : '<span style="color:#ccc">Unassigned</span>';
+
+    const lastColl = m.collections.length > 0
+      ? [...m.collections].sort((a,b) => b.date.localeCompare(a.date))[0].date
+      : null;
+    const lastCollLabel = lastColl
+      ? `<span style="font-size:.82rem">${lastColl}</span>`
+      : '<span style="color:#ccc;font-size:.82rem">No collections yet</span>';
+
+    const rowBg = i % 2 === 0 ? '' : 'background:#fafffe';
+
+    return `
+      <tr style="${rowBg}">
+        <td style="color:var(--gray);font-size:.82rem;font-weight:700">${i + 1}</td>
+        <td><span class="badge">#${m.id}</span></td>
+        <td><strong>${esc(m.firstName)} ${esc(m.lastName)}</strong></td>
+        <td class="addr-col" style="font-size:.82rem;color:var(--gray)">${esc(m.address)}</td>
+        <td>${assocBadge}</td>
+        <td>${lastCollLabel}</td>
+        <td><strong>${m.totalWeight.toFixed(1)} lbs</strong></td>
+        <td>
+          <span style="
+            display:inline-block;padding:.2rem .65rem;border-radius:50px;font-size:.75rem;font-weight:700;
+            ${m.collections.length > 0
+              ? 'background:#d4edda;color:#1e7e34'
+              : 'background:#fff3cd;color:#856404'}
+          ">${m.collections.length > 0 ? '✅ Active' : '⏳ Pending'}</span>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function printReport() {
+  const day     = document.getElementById('report-day').value;
+  const assocId = document.getElementById('report-associate').value;
+  const assoc   = assocId ? ADB.find(assocId) : null;
+  const title   = `Cans for College — ${day || 'All Days'} Collection Route${assoc ? ` · ${assoc.firstName} ${assoc.lastName}` : ''}`;
+
+  const tableHtml = document.getElementById('report-table')?.outerHTML || '<p>No data.</p>';
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <!DOCTYPE html><html><head>
+      <title>${title}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 2rem; font-size: 13px; }
+        h2   { color: #1e7e34; margin-bottom: .25rem; }
+        p    { color: #666; margin-bottom: 1.5rem; font-size: .85rem; }
+        table{ width:100%; border-collapse:collapse; }
+        th   { background:#1e7e34; color:#fff; padding:.5rem .75rem; text-align:left; font-size:12px; }
+        td   { padding:.45rem .75rem; border-bottom:1px solid #eee; font-size:12px; }
+        tr:nth-child(even) td { background:#f9fef9; }
+        @media print { button { display:none; } }
+      </style>
+    </head><body>
+      <h2>📋 ${title}</h2>
+      <p>Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+      ${tableHtml}
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+updateStats();
+renderTable();
+renderAssocTable();
+renderRegMembers();
+populateAssocDropdown();
+</script>
+</body>
+</html>
